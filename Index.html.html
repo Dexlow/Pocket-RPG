@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#171b22">
+<title>Pocket RPG v0.1</title>
+<style>
+  :root {
+    --bg:#11151b; --panel:#1a2029; --panel2:#202734; --text:#f3f5f7;
+    --muted:#9ba7b4; --accent:#78c58f; --danger:#e97878; --mana:#70a8ff;
+    --gold:#e6c16e; --border:#303a48;
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    background:var(--bg); color:var(--text); min-height:100vh;
+  }
+  .wrap { max-width:720px; margin:0 auto; padding:16px 14px 36px; }
+  .topbar { display:flex; gap:8px; align-items:center; justify-content:space-between; flex-wrap:wrap; }
+  h1 { margin:0; font-size:22px; }
+  .small { color:var(--muted); font-size:13px; }
+  .card {
+    background:var(--panel); border:1px solid var(--border); border-radius:14px;
+    padding:14px; margin-top:12px;
+  }
+  .stats { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px 14px; }
+  .stat { font-size:14px; }
+  .bar { height:9px; background:#0d1117; border-radius:999px; overflow:hidden; margin-top:5px; border:1px solid #26303c; }
+  .fill { height:100%; width:50%; background:var(--accent); transition:width .2s ease; }
+  .hpfill { background:var(--danger); }
+  .manafill { background:var(--mana); }
+  .xpfill { background:var(--gold); }
+  .enemy-title { display:flex; justify-content:space-between; gap:10px; align-items:center; }
+  .enemy-name { font-size:20px; font-weight:700; }
+  .controls { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; margin-top:12px; }
+  button {
+    min-height:48px; border-radius:12px; border:1px solid var(--border);
+    background:var(--panel2); color:var(--text); font-size:16px; font-weight:650;
+    padding:10px 12px;
+  }
+  button:active { transform:scale(.99); }
+  button:disabled { opacity:.42; }
+  .primary { background:#244a33; border-color:#3f7652; }
+  .danger { background:#4a2626; border-color:#754141; }
+  .log {
+    max-height:280px; overflow:auto; line-height:1.45; white-space:pre-wrap;
+    font-size:14px; background:#10151c; border-radius:10px; padding:12px;
+  }
+  .inventory { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px 14px; font-size:14px; }
+  .loot { color:#d7c184; }
+  .good { color:#8ed6a2; }
+  .bad { color:#ef8b8b; }
+  .muted { color:var(--muted); }
+  .row { display:flex; gap:8px; flex-wrap:wrap; }
+  .row button { flex:1 1 120px; min-height:42px; font-size:14px; }
+  @media (min-width:600px) {
+    .stats { grid-template-columns:repeat(4,minmax(0,1fr)); }
+    .controls { grid-template-columns:repeat(4,minmax(0,1fr)); }
+    .inventory { grid-template-columns:repeat(4,minmax(0,1fr)); }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <div>
+      <h1>Pocket RPG <span class="small">v0.1</span></h1>
+      <div class="small">Fight → loot → level → repeat.</div>
+    </div>
+    <div class="small" id="saveStatus">Autosave on</div>
+  </div>
+
+  <section class="card">
+    <div class="stats">
+      <div class="stat"><strong id="levelText">Lv. 1</strong><div class="small">Level</div></div>
+      <div class="stat"><strong id="goldText">0</strong><div class="small">Gold</div></div>
+      <div class="stat"><strong id="atkText">5</strong><div class="small">Attack</div></div>
+      <div class="stat"><strong id="defText">1</strong><div class="small">Defense</div></div>
+    </div>
+    <div style="margin-top:12px">
+      <div class="small" id="hpText">HP 30 / 30</div>
+      <div class="bar"><div class="fill hpfill" id="hpBar"></div></div>
+    </div>
+    <div style="margin-top:9px">
+      <div class="small" id="manaText">Mana 10 / 10</div>
+      <div class="bar"><div class="fill manafill" id="manaBar"></div></div>
+    </div>
+    <div style="margin-top:9px">
+      <div class="small" id="xpText">EXP 0 / 40</div>
+      <div class="bar"><div class="fill xpfill" id="xpBar"></div></div>
+    </div>
+  </section>
+
+  <section class="card" id="enemyCard">
+    <div class="enemy-title">
+      <div>
+        <div class="small">Encounter</div>
+        <div class="enemy-name" id="enemyName">No enemy</div>
+      </div>
+      <div class="small" id="enemyLevel"></div>
+    </div>
+    <div style="margin-top:10px">
+      <div class="small" id="enemyHpText">Explore to find a monster.</div>
+      <div class="bar"><div class="fill hpfill" id="enemyHpBar" style="width:0%"></div></div>
+    </div>
+
+    <div class="controls">
+      <button class="primary" id="exploreBtn">Explore</button>
+      <button id="attackBtn" disabled>Attack</button>
+      <button id="powerBtn" disabled>Power Strike</button>
+      <button id="healBtn" disabled>Heal</button>
+      <button id="potionBtn">Potion (0)</button>
+      <button id="runBtn" disabled>Run</button>
+      <button id="restBtn">Rest</button>
+      <button id="resetBtn" class="danger">New Game</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <div style="font-weight:700;margin-bottom:8px">Adventure Log</div>
+    <div class="log" id="log" aria-live="polite"></div>
+  </section>
+
+  <section class="card">
+    <div style="font-weight:700;margin-bottom:8px">Inventory</div>
+    <div class="inventory" id="inventory"></div>
+  </section>
+</div>
+
+<script>
+(() => {
+  const SAVE_KEY = "pocket_rpg_v01";
+
+  const ENEMIES = [
+    {name:"Slime", level:1, hp:18, atk:4, def:0, xp:12, gold:[2,6],
+      drops:[["Slime Gel",0.65],["Health Potion",0.12]]},
+    {name:"Goblin", level:2, hp:26, atk:6, def:1, xp:18, gold:[4,9],
+      drops:[["Goblin Ear",0.55],["Health Potion",0.15],["Rusty Dagger",0.06]]},
+    {name:"Wolf", level:3, hp:34, atk:8, def:2, xp:25, gold:[5,12],
+      drops:[["Wolf Pelt",0.50],["Health Potion",0.12],["Iron Sword",0.03]]}
+  ];
+
+  const freshState = () => ({
+    player:{
+      level:1, xp:0, xpNext:40, hp:30, maxHp:30, mana:10, maxMana:10,
+      atk:5, def:1, gold:0
+    },
+    inventory:{
+      "Health Potion":2,
+      "Slime Gel":0,
+      "Goblin Ear":0,
+      "Wolf Pelt":0,
+      "Rusty Dagger":0,
+      "Iron Sword":0
+    },
+    enemy:null,
+    log:["Welcome to Pocket RPG.", "Tap Explore to find your first monster."]
+  });
+
+  let state = load() || freshState();
+
+  const $ = id => document.getElementById(id);
+  const clamp = (n,a,b) => Math.max(a,Math.min(b,n));
+  const randInt = (a,b) => Math.floor(Math.random()*(b-a+1))+a;
+
+  function save() {
+    localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+    $("saveStatus").textContent = "Saved";
+    setTimeout(() => $("saveStatus").textContent = "Autosave on", 700);
+  }
+
+  function load() {
+    try {
+      const raw = localStorage.getItem(SAVE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  }
+
+  function log(msg, cls="") {
+    state.log.push((cls ? `[${cls}] ` : "") + msg);
+    if (state.log.length > 80) state.log = state.log.slice(-80);
+  }
+
+  function addItem(name, qty=1) {
+    state.inventory[name] = (state.inventory[name] || 0) + qty;
+  }
+
+  function encounter() {
+    if (state.enemy) return;
+    const weights = state.player.level <= 1 ? [0,0,1,1,1,1,1,1,2,2] : [0,0,0,1,1,1,1,2,2,2];
+    const template = ENEMIES[weights[randInt(0,weights.length-1)]];
+    const scale = 1 + Math.max(0, state.player.level - template.level) * 0.08;
+    state.enemy = {
+      name:template.name,
+      level:template.level,
+      maxHp:Math.round(template.hp*scale),
+      hp:Math.round(template.hp*scale),
+      atk:Math.round(template.atk*scale),
+      def:template.def,
+      xp:Math.round(template.xp*scale),
+      gold:template.gold,
+      drops:template.drops
+    };
+    log(`A Lv. ${state.enemy.level} ${state.enemy.name} appears!`);
+    save(); render();
+  }
+
+  function enemyTurn() {
+    if (!state.enemy) return;
+    const dmg = Math.max(1, state.enemy.atk - state.player.def + randInt(-1,1));
+    state.player.hp = clamp(state.player.hp - dmg, 0, state.player.maxHp);
+    log(`${state.enemy.name} hits you for ${dmg} damage.`);
+    if (state.player.hp <= 0) {
+      const lost = Math.floor(state.player.gold * 0.15);
+      state.player.gold -= lost;
+      state.player.hp = state.player.maxHp;
+      state.player.mana = state.player.maxMana;
+      log(`You were defeated. You wake up restored and lose ${lost} gold.`);
+      state.enemy = null;
+    }
+  }
+
+  function playerAttack(mult=1, manaCost=0, label="Attack") {
+    if (!state.enemy) return;
+    if (state.player.mana < manaCost) {
+      log("Not enough mana.");
+      render(); return;
+    }
+    state.player.mana -= manaCost;
+    const base = Math.round(state.player.atk * mult);
+    const crit = Math.random() < 0.10;
+    const dmg = Math.max(1, (crit ? base*2 : base) - state.enemy.def + randInt(0,2));
+    state.enemy.hp = clamp(state.enemy.hp - dmg, 0, state.enemy.maxHp);
+    log(`${label} deals ${dmg} damage${crit ? " — CRITICAL!" : "."}`);
+    if (state.enemy.hp <= 0) win();
+    else enemyTurn();
+    save(); render();
+  }
+
+  function healSkill() {
+    if (!state.enemy) return;
+    if (state.player.mana < 4) { log("Not enough mana."); render(); return; }
+    state.player.mana -= 4;
+    const amount = 10 + state.player.level * 2;
+    state.player.hp = clamp(state.player.hp + amount, 0, state.player.maxHp);
+    log(`Heal restores ${amount} HP.`);
+    enemyTurn();
+    save(); render();
+  }
+
+  function potion() {
+    if ((state.inventory["Health Potion"] || 0) <= 0) { log("You have no potions."); render(); return; }
+    if (state.player.hp >= state.player.maxHp) { log("Your HP is already full."); render(); return; }
+    state.inventory["Health Potion"]--;
+    state.player.hp = clamp(state.player.hp + 18, 0, state.player.maxHp);
+    log("You drink a Health Potion and recover 18 HP.");
+    if (state.enemy) enemyTurn();
+    save(); render();
+  }
+
+  function win() {
+    const e = state.enemy;
+    const gold = randInt(e.gold[0],e.gold[1]);
+    state.player.xp += e.xp;
+    state.player.gold += gold;
+    log(`${e.name} defeated! +${e.xp} EXP, +${gold} gold.`);
+
+    for (const [item,chance] of e.drops) {
+      if (Math.random() < chance) {
+        addItem(item,1);
+        log(`Drop: ${item}`, "LOOT");
+        if (item === "Iron Sword") {
+          state.player.atk += 3;
+          log("Iron Sword auto-equipped: Attack +3.");
+        } else if (item === "Rusty Dagger") {
+          state.player.atk += 1;
+          log("Rusty Dagger auto-equipped: Attack +1.");
+        }
+      }
+    }
+    state.enemy = null;
+    levelCheck();
+  }
+
+  function levelCheck() {
+    while (state.player.xp >= state.player.xpNext) {
+      state.player.xp -= state.player.xpNext;
+      state.player.level++;
+      state.player.xpNext = Math.floor(state.player.xpNext * 1.45);
+      state.player.maxHp += 7;
+      state.player.maxMana += 2;
+      state.player.atk += 2;
+      state.player.def += 1;
+      state.player.hp = state.player.maxHp;
+      state.player.mana = state.player.maxMana;
+      log(`LEVEL UP! You are now Lv. ${state.player.level}. HP, Mana, Attack, and Defense increased.`);
+    }
+  }
+
+  function run() {
+    if (!state.enemy) return;
+    const success = Math.random() < 0.72;
+    if (success) {
+      log(`You escaped from the ${state.enemy.name}.`);
+      state.enemy = null;
+    } else {
+      log("You failed to escape!");
+      enemyTurn();
+    }
+    save(); render();
+  }
+
+  function rest() {
+    if (state.enemy) { log("You can't rest during combat."); render(); return; }
+    state.player.hp = state.player.maxHp;
+    state.player.mana = state.player.maxMana;
+    log("You rest and recover all HP and Mana.");
+    save(); render();
+  }
+
+  function resetGame() {
+    if (!confirm("Start a new game? This erases the current save.")) return;
+    state = freshState();
+    save(); render();
+  }
+
+  function pct(v,max) { return max <= 0 ? 0 : clamp((v/max)*100,0,100); }
+
+  function render() {
+    const p = state.player;
+    $("levelText").textContent = `Lv. ${p.level}`;
+    $("goldText").textContent = p.gold;
+    $("atkText").textContent = p.atk;
+    $("defText").textContent = p.def;
+    $("hpText").textContent = `HP ${p.hp} / ${p.maxHp}`;
+    $("manaText").textContent = `Mana ${p.mana} / ${p.maxMana}`;
+    $("xpText").textContent = `EXP ${p.xp} / ${p.xpNext}`;
+    $("hpBar").style.width = pct(p.hp,p.maxHp)+"%";
+    $("manaBar").style.width = pct(p.mana,p.maxMana)+"%";
+    $("xpBar").style.width = pct(p.xp,p.xpNext)+"%";
+
+    const e = state.enemy;
+    $("enemyName").textContent = e ? e.name : "No enemy";
+    $("enemyLevel").textContent = e ? `Lv. ${e.level}` : "";
+    $("enemyHpText").textContent = e ? `HP ${e.hp} / ${e.maxHp}` : "Explore to find a monster.";
+    $("enemyHpBar").style.width = e ? pct(e.hp,e.maxHp)+"%" : "0%";
+
+    $("exploreBtn").disabled = !!e;
+    $("attackBtn").disabled = !e;
+    $("powerBtn").disabled = !e;
+    $("healBtn").disabled = !e;
+    $("runBtn").disabled = !e;
+    $("potionBtn").textContent = `Potion (${state.inventory["Health Potion"] || 0})`;
+
+    $("log").textContent = state.log.slice(-24).join("\n");
+    $("log").scrollTop = $("log").scrollHeight;
+
+    const inv = $("inventory");
+    inv.innerHTML = "";
+    Object.entries(state.inventory).forEach(([name,qty]) => {
+      const d = document.createElement("div");
+      d.innerHTML = `<strong>${name}</strong><div class="small">× ${qty}</div>`;
+      inv.appendChild(d);
+    });
+  }
+
+  $("exploreBtn").addEventListener("click", encounter);
+  $("attackBtn").addEventListener("click", () => playerAttack(1,0,"Attack"));
+  $("powerBtn").addEventListener("click", () => playerAttack(1.8,3,"Power Strike"));
+  $("healBtn").addEventListener("click", healSkill);
+  $("potionBtn").addEventListener("click", potion);
+  $("runBtn").addEventListener("click", run);
+  $("restBtn").addEventListener("click", rest);
+  $("resetBtn").addEventListener("click", resetGame);
+
+  render();
+})();
+</script>
+</body>
+</html>
